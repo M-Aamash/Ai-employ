@@ -1,0 +1,91 @@
+# Environment and Credentials
+.env
+.env.local
+.env.*.local
+credentials/
+*.pem
+*.key
+*.json
+!package.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+venv/
+env/
+ENV/
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Vault specific (keep structure, ignore sensitive content)
+AI_Employee_Vault/Logs/*.md
+AI_Employee_Vault/In_Progress/
+AI_Employee_Vault/Needs_Action/
+AI_Employee_Vault/Done/
+AI_Employee_Vault/Pending_Approval/
+AI_Employee_Vault/Approved/
+AI_Employee_Vault/Rejected/
+
+# Keep these vault files tracked
+!AI_Employee_Vault/Dashboard.md
+!AI_Employee_Vault/Company_Handbook.md
+!AI_Employee_Vault/Business_Goals.md
+!AI_Employee_Vault/.gitkeep
+
+# Session files
+*.session
+*.session.json
+*.token
+*.token.json
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Backup files
+*.bak
+*.backup
+*.old
