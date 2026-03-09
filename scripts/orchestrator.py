@@ -164,36 +164,36 @@ class Orchestrator:
     
     def process_file(self, file_path: Path):
         """
-        Process a single file using Claude Code.
-        
+        Process a single file using Plan Generator.
+
         Args:
             file_path: Path to the file to process
         """
         self.logger.info(f"Processing file: {file_path.name}")
-        
+
         try:
             # Move to In_Progress
             in_progress_path = self.in_progress / file_path.name
             shutil.move(str(file_path), str(in_progress_path))
-            
+
             # Read the file content
             content = in_progress_path.read_text(encoding='utf-8')
-            
-            # Create prompt for Claude
-            prompt = self._create_claude_prompt(content, in_progress_path.name)
-            
-            # Call Claude Code
-            self.logger.info("Invoking Claude Code...")
-            claude_response = self._call_claude_code(prompt)
-            
-            # Process Claude's response
-            if claude_response:
-                self._process_claude_response(claude_response, in_progress_path)
+
+            # Use Plan Generator instead of Claude Code
+            self.logger.info("Generating plan...")
+            plan_path = self._generate_plan(in_progress_path, content)
+
+            # Process plan result
+            if plan_path:
+                self.logger.info(f"Plan created: {plan_path.name}")
+                # Check if approval needed
+                if self._needs_approval(content):
+                    self._create_approval_request(in_progress_path, content)
             else:
-                self.logger.warning("No response from Claude Code")
+                self.logger.warning("No plan generated")
                 # Move back to Needs_Action on failure
                 shutil.move(str(in_progress_path), str(file_path))
-            
+
         except Exception as e:
             self.logger.error(f"Error processing file {file_path.name}: {e}", exc_info=True)
             # Move back to Needs_Action on error
@@ -202,117 +202,84 @@ class Orchestrator:
             except:
                 pass
     
-    def _create_claude_prompt(self, content: str, filename: str) -> str:
+    def _generate_plan(self, file_path: Path, content: str) -> Path:
         """
-        Create a prompt for Claude Code.
-        
+        Generate a plan using Plan Generator.
+
         Args:
+            file_path: Path to the action file
             content: Content of the action file
-            filename: Name of the file
-            
+
         Returns:
-            Prompt string for Claude
-        """
-        return f"""You are an AI Employee assistant. Process the following action file.
-
-Action File: {filename}
-
-{content}
-
----
-
-Based on this action file, please:
-
-1. **Understand**: What is being requested?
-2. **Check**: Review the Company_Handbook.md and Business_Goals.md for relevant rules
-3. **Plan**: Create a step-by-step plan in the Plans/ folder
-4. **Act**: Execute what you can within your autonomy level
-5. **Request Approval**: For actions requiring human approval, create a file in Pending_Approval/
-6. **Log**: Record all actions in the Logs/ folder
-7. **Update Dashboard**: Update Dashboard.md with the current status
-
-Remember:
-- Follow the Company Handbook rules for autonomy levels
-- Always log your actions
-- Request approval for sensitive actions (payments, external communications)
-- Move completed items to Done/ when finished
-
-Output your response in a structured format with clear sections."""
-    
-    def _call_claude_code(self, prompt: str) -> Optional[str]:
-        """
-        Call Claude Code with the given prompt.
-        
-        Args:
-            prompt: The prompt to send to Claude
-            
-        Returns:
-            Claude's response or None
+            Path to created plan file or None
         """
         try:
-            # Build the Claude Code command
-            cmd = [
-                'claude',
-                '--model', f'claude-3-5-{self.claude_model}-20241022',
-                '--verbose',
-                '--output-format', 'text'
-            ]
+            # Import Plan Generator
+            sys.path.insert(0, str(Path(__file__).parent.parent / '.qwen' / 'skills' / 'plan-generator' / 'scripts'))
+            from plan_generator import PlanGenerator
             
-            # Run Claude Code
-            process = subprocess.Popen(
-                cmd,
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                cwd=str(self.vault_path)
-            )
+            generator = PlanGenerator(str(self.vault_path))
+            plan_path = generator.generate_plan(file_path)
             
-            stdout, stderr = process.communicate(prompt, timeout=300)
+            return plan_path
             
-            if process.returncode != 0:
-                self.logger.error(f"Claude Code error: {stderr}")
-                return None
-            
-            return stdout
-            
-        except subprocess.TimeoutExpired:
-            self.logger.error("Claude Code timed out after 5 minutes")
-            return None
-        except FileNotFoundError:
-            self.logger.error("Claude Code not found. Please install: npm install -g @anthropic/claude-code")
-            return None
         except Exception as e:
-            self.logger.error(f"Error calling Claude Code: {e}")
+            self.logger.error(f"Error generating plan: {e}")
             return None
     
-    def _process_claude_response(self, response: str, in_progress_path: Path):
+    def _needs_approval(self, content: str) -> bool:
         """
-        Process Claude's response and move files appropriately.
-        
+        Check if action requires approval.
+
         Args:
-            response: Claude's response text
-            in_progress_path: Path to the file in In_Progress
+            content: Content of the action file
+
+        Returns:
+            True if approval needed, False otherwise
         """
-        # Log the response
-        log_file = self.logs / f"claude_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
-        log_file.write_text(f"""---
-timestamp: {datetime.now().isoformat()}
-source: {in_progress_path.name}
----
+        # Check for sensitive actions
+        sensitive_keywords = ['send', 'email', 'reply', 'post', 'payment', 'transfer']
+        content_lower = content.lower()
+        
+        return any(keyword in content_lower for keyword in sensitive_keywords)
+    
+    def _create_approval_request(self, file_path: Path, content: str):
+        """
+        Create approval request for sensitive actions.
 
-# Claude Code Response
-
-{response}
-""", encoding='utf-8')
-        
-        self.logger.info(f"Logged response to {log_file.name}")
-        
-        # Move original file to Done
-        done_path = self.done / in_progress_path.name
-        shutil.move(str(in_progress_path), str(done_path))
-        
-        self.logger.info(f"Moved {in_progress_path.name} to Done/")
+        Args:
+            file_path: Path to the action file
+            content: Content of the action file
+        """
+        try:
+            # Import HITL Manager
+            sys.path.insert(0, str(Path(__file__).parent.parent / '.qwen' / 'skills' / 'hitl-workflow' / 'scripts'))
+            from hitl_manager import HITLManager
+            
+            manager = HITLManager(str(self.vault_path))
+            
+            # Parse basic info from content
+            import re
+            match = re.search(r'from:\s*(.+)', content, re.IGNORECASE)
+            from_field = match.group(1).strip() if match else 'Unknown'
+            
+            match = re.search(r'subject:\s*(.+)', content, re.IGNORECASE)
+            subject = match.group(1).strip() if match else 'Action Required'
+            
+            # Determine action type
+            action_type = 'send_email' if 'email' in content.lower() else 'general'
+            
+            details = {
+                'to': from_field,
+                'subject': subject,
+                'priority': 'medium'
+            }
+            
+            approval_path = manager.create_approval_request(action_type, details, content)
+            self.logger.info(f"Approval request created: {approval_path.name}")
+            
+        except Exception as e:
+            self.logger.error(f"Error creating approval request: {e}")
     
     def update_dashboard_status(self):
         """Update the Dashboard.md with current status."""

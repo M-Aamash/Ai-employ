@@ -14,10 +14,10 @@ version: 0.1
 
 | Metric               | Value |
 | -------------------- | ----- |
-| **Pending Actions**  | 1     |
-| **In Progress**      | 0     |
-| **Completed Today**  | 1     |
-| **Pending Approval** | 0     |
+| **Pending Actions**  | 0 |
+| **In Progress**      | 76 |
+| **Completed Today**  | 2 |
+| **Pending Approval** | 1 |
 
 ---
 
