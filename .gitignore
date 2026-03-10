@@ -6,6 +6,7 @@ credentials/
 *.pem
 *.key
 *.json
+.gmail_token.pkl
 !package.json
 
 # Python
